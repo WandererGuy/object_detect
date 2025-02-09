@@ -184,59 +184,19 @@ def main():
 
     step 2 
         detect object in all frames, 
-        isolated them , 
-        create crop_isolated_object_path_ls 
-        to send to other server for color recognition
-
-    step 3 send crop_isolated_object_path_ls to color server
+        isolated them 
 
     """
-    import yaml 
-    HOST = "192.168.1.5"
-    output_queue = Queue()
     freq=1
     mode = 'folder' # or mode = 'folder' for folder, video_path become folder path
-    # video_path = r"C:\Users\Admin\CODE\work\OBJECT_COLOR\object_detect\videostream_09_50_11_11_2024.mp4"
     video_path = r"C:\Users\Admin\CODE\work\OBJECT_COLOR\object_detect\frames\4bf459a7-b37e-4d0a-8b47-3afcf8c493c0"
     logging.info (f'generate folder of frame from video')
     folder_frame = generate_folder_frame(mode, video_path, freq=freq)
     logging.info (f'save every {freq} frames to folder{folder_frame}')
     logging.info ('start detect and saving object from images as background task')
     logging.info ('Also, send folder_frame path to wb server')
-    
-    # url = "http://192.168.1.5:2050/white-balance-sequence"
-    # payload = {'source_folder_path': folder_frame}
-    # thread_api = threading.Thread(target=send_server, args=(url, payload, output_queue)) 
-    # # thread for IO bound (waiting read/ request API return ), multiple process for CPU bound (heavy computation)
-    # thread_api.start()
-    # process_frames(folder_frame)
-    # thread_api.join()
-    # # Retrieve result from the queue
-    # response = output_queue.get()
-    
     res, crop_isolated_object_path_ls = process_frames(folder_frame)
 
-    url = f"http://{HOST}:3013/color-recognize"
-    # for crop_object_path, crop_isolated_object_path in res.items():
-    payload = str(crop_isolated_object_path_ls) 
-    payload = {'img_path_ls': payload}
-
-    thread_api = threading.Thread(target=send_server, args=(url, payload, output_queue)) 
-    # thread for IO bound (waiting read/ request API return ), multiple process for CPU bound (heavy computation)
-    thread_api.start()
-    thread_api.join()
-    response = output_queue.get()
-    t = response["result"]["images_color"]
-    final_res = {}
-    for crop_isolated_object_path, color in t.items():
-        if res[crop_isolated_object_path]:
-            crop_object_path = res[crop_isolated_object_path] 
-            print (fix_path(crop_object_path),'----',  color)
-            final_res[fix_path(crop_object_path)] = color
-        else:
-            raise Exception(f"crop_isolated_object_path {fix_path(crop_object_path)} not found")
-    with open('data.json', 'w') as file:
-        json.dump(final_res, file, indent=2, separators=(',', ':\n\t'))
 
     print ('-----------------------------------')
     print ('DONEEEEE')
