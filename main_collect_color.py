@@ -13,7 +13,10 @@ from queue import Queue
 import numpy as np
 import json
 import gc
+import shutil 
 import time 
+import json 
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",  # Customized format
@@ -191,55 +194,88 @@ def main():
     step 3 send crop_isolated_object_path_ls to color server
 
     """
+    """
+    creating color dataset for training
+    """
     import yaml 
     HOST = "192.168.1.5"
     output_queue = Queue()
-    freq=1
-    mode = 'folder' # or mode = 'folder' for folder, video_path become folder path
+    freq = 4
+    mode = 'video' # or mode = 'folder' for folder, video_path become folder path
     # video_path = r"C:\Users\Admin\CODE\work\OBJECT_COLOR\object_detect\videostream_09_50_11_11_2024.mp4"
-    video_path = r"C:\Users\Admin\CODE\work\OBJECT_COLOR\object_detect\frames\4bf459a7-b37e-4d0a-8b47-3afcf8c493c0"
-    logging.info (f'generate folder of frame from video')
-    folder_frame = generate_folder_frame(mode, video_path, freq=freq)
-    logging.info (f'save every {freq} frames to folder{folder_frame}')
-    logging.info ('start detect and saving object from images as background task')
-    logging.info ('Also, send folder_frame path to wb server')
-    
-    # url = "http://192.168.1.5:2050/white-balance-sequence"
-    # payload = {'source_folder_path': folder_frame}
-    # thread_api = threading.Thread(target=send_server, args=(url, payload, output_queue)) 
-    # # thread for IO bound (waiting read/ request API return ), multiple process for CPU bound (heavy computation)
-    # thread_api.start()
-    # process_frames(folder_frame)
-    # thread_api.join()
-    # # Retrieve result from the queue
-    # response = output_queue.get()
-    
-    res, crop_isolated_object_path_ls = process_frames(folder_frame)
+    video_folder_path = r"D:\all_videos"
+    for video_name in os.listdir(video_folder_path):      
+            video_path = os.path.join(video_folder_path, video_name) 
+            logging.info (f'generate folder of frame from video')
+            folder_frame = generate_folder_frame(mode, video_path, freq=freq)
+            logging.info (f'save every {freq} frames to folder{folder_frame}')
+            logging.info ('start detect and saving object from images as background task')
+            logging.info ('Also, send folder_frame path to wb server')
+            
+            # url = "http://192.168.1.5:2050/white-balance-sequence"
+            # payload = {'source_folder_path': folder_frame}
+            # thread_api = threading.Thread(target=send_server, args=(url, payload, output_queue)) 
+            # # thread for IO bound (waiting read/ request API return ), multiple process for CPU bound (heavy computation)
+            # thread_api.start()
+            # process_frames(folder_frame)
+            # thread_api.join()
+            # # Retrieve result from the queue
+            # response = output_queue.get()
+            
+            res, crop_isolated_object_path_ls = process_frames(folder_frame)
 
-    url = f"http://{HOST}:3013/color-recognize"
-    # for crop_object_path, crop_isolated_object_path in res.items():
-    payload = str(crop_isolated_object_path_ls) 
-    payload = {'img_path_ls': payload}
+            url = f"http://{HOST}:3013/color-recognize"
+            # for crop_object_path, crop_isolated_object_path in res.items():
+            payload = str(crop_isolated_object_path_ls) 
+            payload = {'img_path_ls': payload}
 
-    thread_api = threading.Thread(target=send_server, args=(url, payload, output_queue)) 
-    # thread for IO bound (waiting read/ request API return ), multiple process for CPU bound (heavy computation)
-    thread_api.start()
-    thread_api.join()
-    response = output_queue.get()
-    t = response["result"]["images_color"]
-    final_res = {}
-    for crop_isolated_object_path, color in t.items():
-        if res[crop_isolated_object_path]:
-            crop_object_path = res[crop_isolated_object_path] 
-            print (fix_path(crop_object_path),'----',  color)
-            final_res[fix_path(crop_object_path)] = color
-        else:
-            raise Exception(f"crop_isolated_object_path {fix_path(crop_object_path)} not found")
-    with open('data.json', 'w') as file:
-        json.dump(final_res, file, indent=2, separators=(',', ':\n\t'))
+            thread_api = threading.Thread(target=send_server, args=(url, payload, output_queue)) 
+            # thread for IO bound (waiting read/ request API return ), multiple process for CPU bound (heavy computation)
+            thread_api.start()
+            thread_api.join()
+            response = output_queue.get()
+            t = response["result"]["images_color"]
+            final_res = {}
+            for crop_isolated_object_path, color in t.items():
+                if res[crop_isolated_object_path]:
+                    crop_object_path = res[crop_isolated_object_path] 
+                    print (fix_path(crop_object_path),'----',  color)
+                    final_res[fix_path(crop_object_path)] = color
+                else:
+                    raise Exception(f"crop_isolated_object_path {fix_path(crop_object_path)} not found")
+            with open('data.json', 'w') as file:
+                json.dump(final_res, file, indent=2, separators=(',', ':\n\t'))
+            time.sleep(1)
+            print ('-----------------------------------')
+            print ('DONEEEEE')
+        # with open('data.json') as f:
+        #     data = json.load(f)
+        #     for _, value in data.items():
+        #         folder_name = os.path.join(folder, value)
+        #         os.makedirs(folder_name, exist_ok=True)
+            folder = "D:\color_classify"
 
-    print ('-----------------------------------')
-    print ('DONEEEEE')
+            mapping = {'red_to_orange': '0_red_to_orange', 
+                    'magenta_to_rose': '10_magenta_to_rose', 
+                    'rose_to_red': '11_rose_to_red', 
+                    'orange_to_yellow': '1_orange_to_yellow', 
+                    'yellow_to_chartreuse_green': '2_yellow_to_chartreuse_green', 
+                    'chartreuse_green_to_green': '3_chartreuse_green_to_green', 
+                    'green_to_spring_green': '4_green_to_spring_green', 
+                    'spring_green_to_cyan': '5_spring_green_to_cyan', 
+                    'cyan_to_azure': '6_cyan_to_azure', 
+                    'azure_to_blue': '7_azure_to_blue', 
+                    'blue_to_violet': '8_blue_to_violet', 
+                    'black_grey_white': '12_black_grey_white', 
+                    'violet_to_magenta': '9_violet_to_magenta'}
+            for _, value in mapping.items():
+                folder_name = os.path.join(folder, value)
+                os.makedirs(folder_name, exist_ok=True)
+            with open('data.json') as f:
+                data = json.load(f)
+                for key, value in data.items():
+                    folder_name = os.path.join(folder, mapping[value])
+                    shutil.copy(key, folder_name)
 
 
 
